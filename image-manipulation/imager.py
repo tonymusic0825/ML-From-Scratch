@@ -93,6 +93,11 @@ class Imager():
             clipped = (max(0, anchor[0] - row), max(0, anchor[1] - col))
             self.img = self.img[clipped[0]:anchor[0], clipped[1]:anchor[1], :]
 
+    def horizontalFlip(self):
+        self.img = self.img[::-1, :, :]
+
+    def verticalFlip(self):
+        self.img = self.img[:, ::-1, :]
 
     def reset(self):
         self.img = self.orig_img
@@ -104,20 +109,7 @@ if __name__ == "__main__":
     imager = Imager()
     imager.load_image(path, verbose=True)
 
-    imager.crop((627, 627), 627, 627, "bottom-right")
+    imager.verticalFlip()
     imager.show_image()
-    imager.reset()
-
-    imager.crop((627, 627), 627, 627, "bottom-left")
-    imager.show_image()
-    imager.reset()
-
-    imager.crop((627, 627), 627, 627, "top-left")
-    imager.show_image()
-    imager.reset()
-
-    imager.crop((627, 627), 627, 627, "top-right")
-    imager.show_image()
-    imager.reset()
 
     
