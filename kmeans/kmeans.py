@@ -1,27 +1,23 @@
 """
-Last Edited: 2026-09-27
+Last Edited: 2026-10-01
+Author: Youngsu Choi
+
+K-Means clustering implementation
 
 """
+from __future__ import annotations
 import numpy as np
 import matplotlib.pyplot as plt
 import argparse
 import math
-
-CLUSTER_X = 0
-CLUSTER_Y = 1
-CLUSTER_AVG_X = 2
-CLUSTER_AVG_Y = 3
-CLUSTER_COUNT = 4
-CONVERGENCE_THRESHOLD = 1e-4
-rng = np.random.default_rng()
+import random
 
 def show_kmeans(data, centers=[]):
 
     if centers is None or len(centers) == 0:
         centers = np.array([])
 
-    for blobs in data:
-        plt.scatter(blobs[:, 0], blobs[:, 1])
+    plt.scatter(data[:, 0], data[:, 1])
 
     if centers.size > 0:
         plt.scatter(
@@ -65,96 +61,200 @@ def calc_dist(point1, point2):
 
     return math.sqrt(total) 
 
-def generate_data():
-    # Dummy Data (We will create data loading from csv in a moment)
-    blob1 = np.array([2, 14]) + 2.0 * np.random.randn(32, 2)
-    blob2 = 6 + 1.9 * np.random.randn(32, 2)
-    blob3 = 12 + 2.1 * np.random.randn(32, 2)
-    blob4 = 1 + 3.4 * np.random.rand(32, 2)
+def pairwise_euclidean_dist(X: np.ndarray, Y: np.ndarray) -> float:
+    """Compute the pairwise Euclidean distance between two given points X and Y
 
-    return [blob1, blob2, blob3, blob4]
+    Parameters
+    ----------
 
-def kmeans(args):
 
-    data = generate_data()
+    Raises
+    ------
+    ValueError
+        If the shapes of two given points do not match
 
-    # Parameters
-    k = args.k
-    k_s = {}
-    CONVERGED = [False for i in range(k)]
+    """
 
-    for i in range(k):
-        rand_blob = rng.choice(data)
-        x, y = rng.choice(rand_blob)
-        k_s[i] = [x, y, 0, 0, 0]
+    if X.shape != Y.shape:
+        raise ValueError(
+            f"Dimension mismatch: X has {len(X)} features, "
+            f"while Y has {len(Y)} features"
+        )
+    
+    D = X - Y
+    
+    return np.sqrt(np.dot(D, D))
 
-    # Plotting
-    if args.v:
-        plt.ion()
 
-    # Compare all points to all clusters
-    count_op = 0
-    while True:
-        for blob in data:
-            for (x, y) in blob:
-                min = -1
-                min_dist = float("inf") 
-                for key, value in k_s.items():
-                    dist = calc_dist((value[CLUSTER_X], value[CLUSTER_Y]), (x, y))
+class Kmeans():
 
-                    if dist < min_dist:
-                        min_dist = dist
-                        min = key
+    CONVERGENCE_THRESHOLD = 1e-4
+    MAX_ITER = 1000
 
-                k_s[min][CLUSTER_AVG_X] += x 
-                k_s[min][CLUSTER_AVG_Y] += y
-                k_s[min][CLUSTER_COUNT] += 1
+    def __init__(self, k):
+        self.k = k
+        self.max_iter = self.MAX_ITER
+        self.data = None
+        self.centers = None
+    
+    def load_data(self, path):
+        """Loads data from CSV file
 
-        for i in range(k):
-            if k_s[i][CLUSTER_COUNT] != 0:
+        Example
+        -------
+        Each row in the csv is expected to represent a single data point.
 
-                temp_x = k_s[i][CLUSTER_AVG_X] / k_s[i][CLUSTER_COUNT]
-                temp_y = k_s[i][CLUSTER_AVG_Y] / k_s[i][CLUSTER_COUNT]
+        E.g. 1, 1, 2, 3
+             2, 4, 2, 1
+             3, 3, 3, 3
+
+        Represents 3 data points in 4 dimensions resulting in data shape of [X, 4]
+
+        WARNING
+        ------
+        This function does not check data shape integrity. 
+        Error will only flagged during euclidean distance calculation
+
+        Raises
+        ------
+        ValueError
+            If any non-numeric other than comma is detected
+        
+        """
+
+        data = []
+
+        with open(path) as f:
+            for point in f:
+                data.append(point.split(','))
+
+                # Cast to float
+                for i in range(len(data[-1])):
+                    try:
+                        data[-1][i] = float(data[-1][i])
+                    except ValueError:
+                        print(f"Data at index {len(data)}. {i} = {data[-1][i]} which is not a number.")
+                
+
+            self.data = np.array(data)
+
+            f.close()
+        
+        self.create_centers()
+    
+    def create_centers(self):
+        """Creates centers with k and data.
+
+        WARNING
+        ------- 
+        Data must be filled!
+
+        """
+
+        if self.data is None:
+            raise ValueError(
+                "No data has been loaded"
+            )
+        
+        centers = []
+        rng = np.random.default_rng()
+
+        for i in range(self.k):
+            centers.append(rng.choice(self.data))
+        
+        self.centers = np.array(centers)
+
+    def visualize_data(self, v_centers):
+        """Visualises data using scatter plot
+        
+        WARNING
+        -------
+        This function only works for 2-D data
+        
+        """
+
+        if self.data is None or self.data.shape[1] != 2:
+            return
+        
+        if v_centers:
+            show_kmeans(self.data, self.centers)
+        else:
+            show_kmeans(self.data) 
+    
+    def generate_data(
+        self, n_clusters=4, n_samples_per_cluster=64,
+        n_features=2, spread_factor=0.35,
+        seed=None
+    ):
+        """Generates random cluster data"""
+
+        if seed is None:
+            seed = random.randint(1, 1000)
+
+        rng = np.random.default_rng(seed)
+        centers = rng.uniform(-5.0, 5.0, size=(n_clusters, n_features))
+
+        diffs = centers[:, None, :] - centers[None, :, :]
+        dists = np.linalg.norm(diffs, axis=-1)
+        # Mask out self-distance (diagonal zeros) to get distance to other centers
+        np.fill_diagonal(dists, np.nan)
+        avg_min_dist = np.nanmean(np.nanmin(dists, axis=1))
+
+        cluster_std = avg_min_dist * spread_factor
+        noise = rng.standard_normal((n_clusters, n_samples_per_cluster, n_features))
+        points = centers[:, None, :] + noise * cluster_std
+
+        X = points.reshape(-1, n_features)
+        
+        self.data = X
+        self.create_centers()
+    
+    def has_converged(self, new_centers):
+
+        return False
+        
+    def fit(self):
+        """Performs K-means. If no data was loaded random data will be generated
+
+        """
+
+        if self.data is None:
+            self.data = generate_data() 
+        
+        count = 0
+
+        while True:
+            converged = True
+            
+            # Euclidean dist
+            diff = self.centers[:, None, :] - self.data[None, :, :]
+            diff = np.sum(np.square(diff), axis=2)
+            diff = np.argmin(diff, axis=0) 
+
+            # Update centers
+            for i in range(self.k):
+                
+                bool_a = diff == i
+                bool_data = self.data[bool_a]
+
+                if len(bool_data) == 0:
+                    continue
+
+                new_center = np.mean(bool_data, axis=0)
 
                 # Check for convergence
-                if abs(temp_x - k_s[i][CLUSTER_X]) < CONVERGENCE_THRESHOLD or abs(temp_y - k_s[i][CLUSTER_Y]) < CONVERGENCE_THRESHOLD:
-                    CONVERGED[i] = True
+                diff_bool = np.abs((self.centers[i] - new_center)) > self.CONVERGENCE_THRESHOLD
 
-                k_s[i][CLUSTER_X] = temp_x
-                k_s[i][CLUSTER_Y] = temp_y
-                k_s[i][CLUSTER_AVG_X] = 0
-                k_s[i][CLUSTER_AVG_Y] = 0
-                k_s[i][CLUSTER_COUNT] = 0
+                if np.sum(diff_bool) > 0:
+                    converged = False
 
-        count_op += 1
+                self.centers[i] = new_center
 
-        if args.v:
-            centers_list = [[k_s[i][CLUSTER_X], k_s[i][CLUSTER_Y]] for i in range(k)]
-            centers = np.array(centers_list)
-            update_live_plot(data, centers, count_op)
+            count += 1
 
-        if False not in CONVERGED:
-            print(f"Iterated {count_op} times")
-            break
-
-    if args.v:
-        plt.ioff()
-        plt.show()
-
-    if not args.v:
-        centers_list = []
-
-        for i in range(k):
-            x, y = k_s[i][CLUSTER_X], k_s[i][CLUSTER_Y]
-            centers_list.append([x, y])
-
-        centers = np.array(centers_list)
-        show_kmeans(data, centers)
+            if converged or count > self.MAX_ITER:
+                print(f"Iterated {count} times")
+                break
 
 
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Train MicroFlowDiT")
-    parser.add_argument("--k", type=int, default=1)
-    parser.add_argument("--v", action="store_true")
-    args = parser.parse_args()
-    kmeans(args)
+
