@@ -94,10 +94,20 @@ class Imager():
             self.img = self.img[clipped[0]:anchor[0], clipped[1]:anchor[1], :]
 
     def horizontalFlip(self):
+        """Flips the image over the horizontal axis"""
         self.img = self.img[::-1, :, :]
 
     def verticalFlip(self):
+        """Flips the image over the vertical axis"""
         self.img = self.img[:, ::-1, :]
+
+    def rotate(self, clockwise=True):
+        """Rotates image 90 degrees once"""
+
+        if clockwise:
+            self.img = np.transpose(self.img, (1, 0, 2))[:, ::-1, :]
+        else: 
+            self.img = np.transpose(self.img, (1, 0, 2))[::-1, :, :]
 
     def reset(self):
         self.img = self.orig_img
@@ -109,7 +119,7 @@ if __name__ == "__main__":
     imager = Imager()
     imager.load_image(path, verbose=True)
 
-    imager.verticalFlip()
+    imager.rotate(clockwise=False)
     imager.show_image()
 
     
