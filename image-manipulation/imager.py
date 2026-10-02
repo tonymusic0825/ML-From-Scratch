@@ -34,6 +34,7 @@ class Imager():
     def __init__(self):
         self.img = None
         self.orig_img = None
+        self.color_order = "RGB"
     
     def load_image(self, path, verbose=False):
         self.orig_img = self.img = np.array(PIL.Image.open(path)).astype(np.float16)
@@ -109,8 +110,29 @@ class Imager():
         else: 
             self.img = np.transpose(self.img, (1, 0, 2))[::-1, :, :]
 
+    def get_channel(self, color='R'):
+        """Returns a copy of a single RGB Channel from current image
+
+        WARNING
+        -------
+        The image when loaded first time is always assumed to be in R -> G -> B format. 
+        """
+
+        return self.img[:,:, self.color_order.index(color.upper())].copy()
+
+    def swap_channels(self, order="RGB"):
+        """Re-orders the colours channels to the order given.
+        
+        """
+        order = order.upper()
+        order_idx = [self.color_order.index(i) for i in order]
+
+        self.img = self.img[:, :, order_idx]
+        self.color_order = order
+
     def reset(self):
         self.img = self.orig_img
+
 
 
 
@@ -118,8 +140,8 @@ if __name__ == "__main__":
     path = "./test2.jpg"
     imager = Imager()
     imager.load_image(path, verbose=True)
-
-    imager.rotate(clockwise=False)
+    imager.swap_channels("BGR")
     imager.show_image()
-
+    imager.swap_channels("RGB")
+    imager.show_image()
     
