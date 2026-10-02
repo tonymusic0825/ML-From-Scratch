@@ -24,21 +24,22 @@ def visualize_image(img):
     subprocess.run(["kitty", "+kitten", "icat"], input=buffer.getvalue())
 
 
-def print_image_info(img):
-
-    print("IMAGE INFO:")
-    print(f"")
-
 class Imager():
 
     def __init__(self):
         self.img = None
         self.orig_img = None
         self.color_order = "RGB"
+        self.max_pixel_val = None
+        self.min_pixel_val = None
+
+    def _clip(self):
+        self.img = np.clip(self.img, self.min_pixel_val, self.max_pixel_val).astype(np.uint8)
     
     def load_image(self, path, verbose=False):
-        self.orig_img = self.img = np.array(PIL.Image.open(path)).astype(np.float16)
-        visualize_image(self.img)
+        self.orig_img = self.img = np.array(PIL.Image.open(path))
+        self.max_pixel_val = np.max(self.img)
+        self.min_pixel_val = np.min(self.img) 
 
         print(f"Successfully Loaded {path}")
 
@@ -46,8 +47,8 @@ class Imager():
             print("----- IMAGE STATISTICS -----")
             print(f"Shape: {self.img.shape}")
             print(f"dtype: {self.img.dtype}")
-            print(f"min: {np.max(self.img)}")
-            print(f"max: {np.min(self.img)}")
+            print(f"min: {self.min_pixel_val}")
+            print(f"max: {self.max_pixel_val}")
             print("----- IMAGE STATISTICS -----")
     
     def get_image_dim(self):
@@ -122,6 +123,11 @@ class Imager():
 
     def swap_channels(self, order="RGB"):
         """Re-orders the colours channels to the order given.
+
+        WARNING
+        -------
+        Changing the channel order changes the actual current image that is being held.
+        Refer to get_channel() or reset() for information
         
         """
         order = order.upper()
@@ -129,6 +135,41 @@ class Imager():
 
         self.img = self.img[:, :, order_idx]
         self.color_order = order
+
+    def change_brightness(self, value):
+        """
+        
+        """
+
+        self.img = self.img.astype(np.float16)
+        self._clip()
+
+    def change_constrast(self, factor):
+
+        self.img = self.img.astype(np.float16)
+        mean = self.img.mean()
+        self.img = (self.img - mean)*factor + mean
+
+        self._clip()
+
+    def invert(self):
+        self.img = self.max_pixel_val - self.img 
+
+    def grayscale(self):
+
+        coeff = np.array([0.299, 0.587, 0.114])
+
+        # self.img = np.dot(self.img, coeff).astype(np.uint8)
+        # self.img = np.tensordot(self.img, coeff, axes=([2], [0])).astype(np.uint8)
+        self.img = (self.img * coeff).sum(axis=2).astype(np.uint8)
+
+    def threshold(self):
+
+        self.grayscale()
+
+        self.img = ((self.img > 128) * 255).astype(np.uint8)
+        # self.img = np.where((self.img > 128), 255, 0).astype(np.uint8) 
+
 
     def reset(self):
         self.img = self.orig_img
@@ -140,8 +181,7 @@ if __name__ == "__main__":
     path = "./test2.jpg"
     imager = Imager()
     imager.load_image(path, verbose=True)
-    imager.swap_channels("BGR")
     imager.show_image()
-    imager.swap_channels("RGB")
+    imager.threshold()
     imager.show_image()
     
